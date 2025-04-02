@@ -10,11 +10,11 @@ from modules.utils import configure_page, session_state_init
 import config
 
 # Page imports
-from pages import dashboard, supply_demand_explorer, forecasting, model_insights#, scenario_analysis, correlation_analysis
+from pages import dashboard, supply_demand_explorer, forecasting, model_insights
 
 # Set page configuration
 st.set_page_config(
-    page_title="OilX Supply & Demand Forecaster",
+    page_title="OilX Market Analyzer",
     page_icon="🛢️",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -37,15 +37,15 @@ def get_data():
 st.sidebar.markdown('<div class="main-header">OilX Market Analyzer</div>', unsafe_allow_html=True)
 
 # Add logo (comment out if not available)
-st.sidebar.image("logo.png", width=100)
+try:
+    st.sidebar.image("logo.png", width=100)
+except:
+    st.sidebar.info("Logo file not found.")
 
 # Navigation
 page = st.sidebar.radio("Navigation", 
     ["Dashboard", "Supply & Demand Explorer", "Forecasting", 
      "Model Insights", "Scenario Analysis", "Correlation Analysis"])
-
-# Data filters
-st.sidebar.markdown("### Data Filters")
 
 # Load base data
 with st.spinner("Loading data..."):
@@ -60,18 +60,31 @@ countries = sorted(data["CountryName"].unique())
 products = sorted(data["Product"].unique())
 flow_metrics = sorted(data["FlowBreakdown"].unique())
 
-# Add filters to sidebar
-selected_countries = st.sidebar.multiselect("Countries", countries, default=countries[:3])
-selected_products = st.sidebar.multiselect("Products", products, default=[products[0]])
-selected_flows = st.sidebar.multiselect("Flow Metrics", flow_metrics, default=[f for f in flow_metrics if "Demand" in f][:1])
+# Add simplified filters to sidebar
+st.sidebar.markdown("### Quick Filters")
 
-# Date range filter
+# Create a more efficient filter system
+selected_products = st.sidebar.multiselect(
+    "Products", 
+    products, 
+    default=[products[0] if products else None]
+)
+
+# Instead of filtering countries in the sidebar, we'll do that in the dashboard
+# This keeps the sidebar cleaner and more focused
+
+# Date range filter with improved defaults
 min_date = pd.to_datetime(data["ReferenceDate"]).min().date()
 max_date = pd.to_datetime(data["ReferenceDate"]).max().date()
 
+# Default to last 2 years
+default_start = max_date - timedelta(days=365*2)
+if default_start < min_date:
+    default_start = min_date
+
 date_range = st.sidebar.date_input(
     "Date Range",
-    value=(max_date - timedelta(days=365*2), max_date),
+    value=(default_start, max_date),
     min_value=min_date,
     max_value=max_date
 )
@@ -91,15 +104,9 @@ filtered_data = filtered_data[
     (pd.to_datetime(filtered_data["ReferenceDate"]).dt.date <= end_date)
 ]
 
-# Apply other filters if selected
-if selected_countries:
-    filtered_data = filtered_data[filtered_data["CountryName"].isin(selected_countries)]
-
+# Apply product filter if selected
 if selected_products:
     filtered_data = filtered_data[filtered_data["Product"].isin(selected_products)]
-
-if selected_flows:
-    filtered_data = filtered_data[filtered_data["FlowBreakdown"].isin(selected_flows)]
 
 # Process the data
 processed_data = preprocess_data(filtered_data)
@@ -114,7 +121,10 @@ st.sidebar.markdown(f"- Date Range: {processed_data['ReferenceDate'].min().date(
 
 # Version info
 st.sidebar.markdown("---")
-st.sidebar.markdown(f"v{config.APP_VERSION}")
+try:
+    st.sidebar.markdown(f"v{config.APP_VERSION}")
+except:
+    st.sidebar.markdown("v1.0.0")
 
 # Load the appropriate page
 if page == "Dashboard":
@@ -126,6 +136,10 @@ elif page == "Forecasting":
 elif page == "Model Insights":
     model_insights.show(processed_data)
 elif page == "Scenario Analysis":
-    scenario_analysis.show(processed_data)
+    # fallback for pages not yet implemented
+    st.title("Scenario Analysis")
+    st.info("This feature is under development.")
 elif page == "Correlation Analysis":
-    correlation_analysis.show(processed_data)
+    # fallback for pages not yet implemented
+    st.title("Correlation Analysis")
+    st.info("This feature is under development.")
